@@ -1,0 +1,92 @@
+import 'dart:math';
+import 'package:flame/events.dart';
+import 'package:flame/game.dart';
+import 'package:flame/components.dart';
+import 'package:flutter/material.dart';
+
+import 'config.dart';
+
+class RacingGame extends FlameGame with TapCallbacks {
+  late Player player;
+  double nextSpawnSeconds = 0;
+  @override
+  Future<void> onLoad() async {
+    player = Player(
+      position: Vector2(size.x * 0.25, size.y - 20),
+    );
+
+    add(player);
+    for (int i = 0; i < 10; i++) {
+      add(Star(Vector2(size.x * (i > 5 ? 0.75 : 0.25), 0)));
+    }
+  }
+
+  @override
+  void onTapDown(TapDownEvent event) {
+    super.onTapDown(event);
+    if (!event.handled) {
+      final touchPoint = event.canvasPosition;
+      if (touchPoint.x > size.x / 2) {
+        player.position = Vector2(size.x * 0.75, size.y - 20);
+      } else {
+        player.position = Vector2(size.x * 0.25, size.y - 20);
+      }
+    }
+  }
+
+  @override
+  void update(dt) {
+    super.update(dt);
+    /*
+    nextSpawnSeconds -= dt;
+    if (nextSpawnSeconds < 0) {
+      //  add(Star(Vector2(size.x * (Random().nextInt(10) > 5 ? 0.75 : 0.25), 0)));
+      //nextSpawnSeconds = 0.3 + Random().nextDouble() * 2;
+    }
+    */
+  }
+}
+
+class Player extends RectangleComponent with TapCallbacks {
+  static const playerSize = [80.0, 155.0];
+  Player({required position})
+      : super(
+          position: position,
+          size: Vector2.array(playerSize),
+          anchor: Anchor.bottomCenter,
+        );
+  @override
+  void onTapDown(TapDownEvent event) {
+    super.onTapDown(event);
+    dPrint('called onTapDown');
+  }
+}
+
+class Star extends RectangleComponent with HasGameRef {
+  static const starSize = [80.0, 155.0];
+
+  Star(position)
+      : super(
+          position: position,
+          size: Vector2.array(starSize),
+          anchor: Anchor.bottomCenter,
+        );
+
+  @override
+  Future<void> onLoad() async {
+    super.onLoad();
+
+    paint.color = Colors.yellow;
+  }
+
+  @override
+  void update(double dt) {
+    super.update(dt);
+    /*
+    position.y = position.y + 5;
+    if (position.y - size.y > gameRef.size.y) {
+      removeFromParent();
+    }
+    */
+  }
+}

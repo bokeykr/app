@@ -1,0 +1,302 @@
+import 'dart:convert';
+import 'dart:math';
+
+import 'package:app/config.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart';
+import 'package:flutter_spinbox/flutter_spinbox.dart';
+
+class MansePage extends StatefulWidget {
+  String? birth;
+  String? tm, ntm, sname;
+
+  int? sex;
+  int? bdt;
+  int? gap;
+  MansePage(
+      {super.key,
+      this.birth,
+      this.sname,
+      this.tm,
+      this.ntm,
+      this.sex,
+      this.bdt,
+      this.gap});
+
+  @override
+  State<MansePage> createState() => _MansePageState();
+}
+
+class _MansePageState extends State<MansePage> {
+  int sex = 0;
+  int bdt = 0;
+  var dateEditingController = TextEditingController();
+  var timeEditingController = TextEditingController();
+  TextEditingController _name = TextEditingController();
+  var tgap = -32;
+  var jdate = [];
+  var jtime = [];
+  var jgap = [];
+  var err = 0;
+  String err_msg = "";
+  @override
+  void initState() {
+    super.initState();
+
+    if (widget.birth == null) {
+    } else {
+      _name.text = widget.sname!;
+      dateEditingController.text = widget.birth!;
+      timeEditingController.text = widget.tm!;
+      sex = widget.sex!;
+      bdt = widget.bdt!;
+    }
+    //tgap = 32 + 1000;
+  }
+
+  /*
+  toast(msg) {
+    Fluttertoast.showToast(
+        msg: msg,
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.CENTER,
+        timeInSecForIosWeb: 1,
+        backgroundColor: Colors.red,
+        textColor: Colors.white,
+        fontSize: 16.0);
+  }
+  */
+  void toast(String msg, int no) {
+    setState(() {
+      err_msg = msg;
+      err = no;
+    });
+  }
+
+  getErrMsg() {
+    return Container(
+        alignment: Alignment.centerLeft,
+        child: Text('* $err_msg',
+            style: const TextStyle(
+                color: Colors.red, fontSize: 10, fontWeight: FontWeight.bold)));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    var sz = MediaQuery.of(context).size;
+    double sw = min(sz.width, 600.0);
+    return Scaffold(
+        appBar: AppBar(
+          title: const Text('만세력'),
+          actions: [
+            TextButton(
+              onPressed: () async {
+                var name = _name.text.trim();
+                var birth = dateEditingController.text.trim();
+                if (birth.length != 8) {
+                  toast('생년월일를 정확히 입력하세요.', 0);
+                  return;
+                }
+                var y = int.tryParse(birth.substring(0, 4));
+                var m = int.tryParse(birth.substring(4, 6));
+                var d = int.tryParse(birth.substring(6, 8));
+                if (y == null || m == null || d == null) {
+                  toast('생년월일를 정확히 입력하세요.', 0);
+                  return;
+                }
+                if (y < 1890 ||
+                    y > 2050 ||
+                    m > 12 ||
+                    m < 1 ||
+                    d > 31 ||
+                    d < 1) {
+                  toast('생년월일를 정확히 입력하세요.', 0);
+                  return;
+                }
+                var tm = timeEditingController.text.trim();
+                if (tm.length != 4) {
+                  toast('생시를 정확히 입력하세요.', 1);
+                  return;
+                }
+
+                var h = int.tryParse(tm.substring(0, 2));
+                var n = int.tryParse(tm.substring(2, 4));
+                if (h == null || n == null) {
+                  toast('생시를 정확히 입력하세요.', 1);
+                  return;
+                }
+                if (h > 23 || h < 0 || n > 59 || n < 0) {
+                  toast('생시를 정확히 입력하세요.', 1);
+                  return;
+                }
+                var r = await http.post(getUrl(),
+                    body: {'mode': 'manse', 'birth': birth, 'dt': '$bdt'});
+                dPrint(r.body);
+                if (r.body.isEmpty) {
+                  dPrint("res empty");
+                  toast('존재하지 않는 날짜입니다.', 0);
+                  return;
+                }
+                var j = jsonDecode(r.body);
+                var ndt = DateTime.parse('${j['sol']}T$tm');
+                dPrint('$ndt');
+                var ndt2 = ndt.add(Duration(minutes: tgap + 30));
+                var ndt3 = DateFormat('yyyyMMdd').format(ndt2);
+                var ndt4 = DateFormat('HHmm').format(ndt2);
+                dPrint('$ndt2 $ndt3 $ndt4');
+                if (!mounted) return;
+                if (ndt3 != j['sol']) {
+                  var r = await http.post(getUrl(), body: {
+                    'mode': 'manse',
+                    'birth': ndt3,
+                    'dt': '0'
+                  }).then((r) {
+                    if (r.body.isEmpty) {
+                      toast('에러! 잠시후 다시 이용해주세요.', 2);
+                    } else {
+                      var j = jsonDecode(r.body);
+                      Navigator.of(context)
+                          .pop([j, birth, tm, ndt4, sex, bdt, tgap, name]);
+                    }
+                  });
+                } else {
+                  Navigator.of(context)
+                      .pop([j, birth, tm, ndt4, sex, bdt, tgap, name]);
+                }
+              },
+              child: const Text("확인"),
+            )
+          ],
+        ),
+        body: SingleChildScrollView(
+            child: Container(
+                alignment: Alignment.topCenter,
+                child: Container(
+                    width: sw,
+                    padding: const EdgeInsets.all(8),
+                    child: Column(mainAxisSize: MainAxisSize.min, children: [
+                      Padding(
+                        padding: EdgeInsets.all(8),
+                        child: TextField(
+                          maxLength: 20,
+                          controller: _name,
+                          decoration: const InputDecoration(
+                            labelText: '이름을 입력하세요',
+                          ),
+                        ),
+                      ),
+                      Padding(
+                          padding: EdgeInsets.all(8),
+                          child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text("성별"),
+                                Row(
+                                  children: [
+                                    TextButton.icon(
+                                        icon: Icon(sex == 0
+                                            ? Icons.check_box
+                                            : Icons.check_box_outline_blank),
+                                        label: const Text("남자"),
+                                        onPressed: () {
+                                          setState(() {
+                                            sex = 0;
+                                          });
+                                        }),
+                                    TextButton.icon(
+                                        icon: Icon(sex == 1
+                                            ? Icons.check_box
+                                            : Icons.check_box_outline_blank),
+                                        label: const Text("여자"),
+                                        onPressed: () {
+                                          setState(() {
+                                            sex = 1;
+                                          });
+                                        }),
+                                  ],
+                                ),
+                              ])),
+                      Padding(
+                          padding: const EdgeInsets.all(8),
+                          child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text("양/음력"),
+                                Row(
+                                  children: [
+                                    TextButton.icon(
+                                        icon: Icon(bdt == 0
+                                            ? Icons.check_box
+                                            : Icons.check_box_outline_blank),
+                                        label: const Text("양력"),
+                                        onPressed: () {
+                                          setState(() {
+                                            bdt = 0;
+                                          });
+                                        }),
+                                    TextButton.icon(
+                                        icon: Icon(bdt == 1
+                                            ? Icons.check_box
+                                            : Icons.check_box_outline_blank),
+                                        label: const Text("음력"),
+                                        onPressed: () {
+                                          setState(() {
+                                            bdt = 1;
+                                          });
+                                        }),
+                                    TextButton.icon(
+                                        icon: Icon(bdt == 2
+                                            ? Icons.check_box
+                                            : Icons.check_box_outline_blank),
+                                        label: const Text("음력 윤달"),
+                                        onPressed: () {
+                                          setState(() {
+                                            bdt = 2;
+                                          });
+                                        })
+                                  ],
+                                ),
+                              ])),
+                      const Text("생년월일 (YYYYMMDD)"),
+                      TextFormField(
+                        controller: dateEditingController,
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                        ],
+                        decoration: const InputDecoration(
+                          border: OutlineInputBorder(),
+                          hintText: '20000815',
+                        ),
+                        maxLength: 8,
+                      ),
+                      if (err == 0) getErrMsg(),
+                      const Text("생시 (HHMM) 24시간표시"),
+                      TextFormField(
+                        controller: timeEditingController,
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                        ],
+                        decoration: const InputDecoration(
+                          border: OutlineInputBorder(),
+                          hintText: '1230',
+                        ),
+                        maxLength: 4,
+                      ),
+                      if (err == 1) getErrMsg(),
+                      const Text("시차"),
+                      SpinBox(
+                        min: -100,
+                        max: 100,
+                        step: 1.0,
+                        value: tgap * 1.0,
+                        onChanged: (value) {
+                          tgap = value.toInt();
+                        },
+                      ),
+                    ])))));
+  }
+}

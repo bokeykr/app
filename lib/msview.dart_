@@ -1,0 +1,309 @@
+import 'dart:convert';
+import 'dart:math';
+
+import 'package:app/config.dart';
+import 'package:app/lib_manse.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart';
+import 'package:sprintf/sprintf.dart';
+
+import 'manse.dart_';
+
+class MSViewPage extends StatefulWidget {
+  /*
+  final dynamic j;
+  final String birth, tm, ntm;
+  final int sex;
+  final int bdt;
+  final int gap;
+  const MSViewPage(
+      {super.key,
+      required this.j,
+      required this.birth,
+      required this.tm,
+      required this.ntm,
+      required this.gap,
+      required this.sex,
+      required this.bdt});
+  */
+  final int no;
+  const MSViewPage({super.key, required this.no});
+  @override
+  State<MSViewPage> createState() => _MSViewPageState();
+}
+
+class _MSViewPageState extends State<MSViewPage> {
+  late CHdb hdb;
+  var BDT = ['양력', '음력 평달', '음력 윤달'];
+  String sname = "";
+  late int days;
+  late int hndx;
+  late bool dir;
+  late dynamic j;
+  late String birth, tm, ntm, sol2;
+  late int sex;
+  late int bdt;
+  late int gap;
+  late int cury;
+  bool bReady = false;
+  d2Str(String s) {
+    var y = s.substring(0, 4);
+    var m = s.substring(4, 6);
+    var d = s.substring(6, 8);
+    return sprintf(
+        "%4d년 %2d월 %2d일", [int.parse(y), int.parse(m), int.parse(d)]);
+  }
+
+  t2Str(String s) {
+    var h = s.substring(0, 2);
+    var n = s.substring(2, 4);
+    return sprintf("%2d시 %2d분", [int.parse(h), int.parse(n)]);
+  }
+
+  doInit() {
+    dPrint(j);
+    dPrint(birth);
+    dPrint(tm);
+    dPrint(ntm);
+    dPrint(sex);
+    dPrint(bdt);
+    dPrint(gap);
+    var hh = int.parse(ntm.substring(0, 2)) ~/ 2;
+    hdb = CHdb.fromJson(j, hh);
+    hndx = hdb.dndx * 12 + hh;
+    dir = (sex == 0 && hdb.yndx % 2 == 0) || (sex == 1 && hdb.yndx % 2 == 1);
+    dPrint(dir);
+    dPrint(hdb.jul1);
+    var soldt = DateTime.parse(hdb.sol);
+    var soldt2 = DateTime.parse('${hdb.sol}T$ntm');
+    print(soldt2);
+    var soldt3 = soldt2.add(Duration(minutes: gap));
+    sol2 = DateFormat('yyyy년 MM월 dd일 H시 m분').format(soldt3);
+    print(sol2);
+    var diff = !dir ? soldt.difference(hdb.jdt1) : hdb.jdt3.difference(soldt);
+    days = diff.inDays + (dir ? 0 : -1);
+    days = (days ~/ 3) + ((days % 3) == 2 ? 1 : 0);
+    if (days == 0) days = 1;
+    dPrint('대운: ${dir ? '순행' : '역행'} $days');
+    cury = DateTime.now().year - 1864;
+
+    setState(() {
+      bReady = true;
+    });
+  }
+
+  callManse(bool bNew) async {
+    var r;
+    if (bNew) {
+      r = await Navigator.push(
+          context, MaterialPageRoute(builder: (context) => MansePage()));
+      if (r == null && mounted) {
+        Navigator.of(context).pop();
+      }
+    } else {
+      r = await Navigator.push(
+          context,
+          MaterialPageRoute(
+              builder: (context) => MansePage(
+                  birth: birth,
+                  sname: sname,
+                  tm: tm,
+                  ntm: ntm,
+                  sex: sex,
+                  bdt: bdt,
+                  gap: gap)));
+    }
+    if (!mounted) return;
+
+    j = r[0];
+    birth = r[1];
+    tm = r[2];
+    ntm = r[3];
+    sex = r[4];
+    bdt = r[5];
+    gap = r[6];
+    sname = r[7];
+    doInit();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.no == -1) {
+      Future.delayed(Duration.zero, () async {
+        callManse(true);
+      });
+    } else {
+      doInit();
+    }
+  }
+
+  getDaeList(sw) {
+    var w = sw / 12;
+    return SizedBox(
+        height: 100,
+        child: ListView.separated(
+            shrinkWrap: true,
+            reverse: true,
+            scrollDirection: Axis.horizontal,
+            itemBuilder: (ctx, ndx) {
+              return Container(
+                  padding: const EdgeInsets.all(4),
+                  child: Column(children: [
+                    Text('${ndx * 10 + days}'),
+                    Text('${hdb.yndx + 1864 + ndx * 10 + days}'),
+                    Text(msGan[(dir
+                            ? hdb.mndx + ndx + 1
+                            : hdb.mndx + 100 - (ndx + 1)) %
+                        10]),
+                    Text(msJi[(dir
+                            ? hdb.mndx + ndx + 1
+                            : hdb.mndx + 120 - (ndx + 1)) %
+                        12]),
+                  ]));
+            },
+            separatorBuilder: (ctx, ndx) {
+              return const SizedBox(width: 4);
+            },
+            itemCount: 12));
+  }
+
+  getRow(a, b) {
+    return Row(children: [
+      Container(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          width: 100,
+          child: a),
+      b
+    ]);
+  }
+
+  getSaju(n) {
+    return Padding(
+        padding: const EdgeInsets.all(8),
+        child: Column(children: [
+          Text(
+            msGan[n % 10],
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          ),
+          Text(
+            msJi[n % 12],
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          )
+        ]));
+  }
+
+  getYears() {
+    return Container(
+        height: 100,
+        child: ListView.separated(
+            physics: const AlwaysScrollableScrollPhysics(),
+            shrinkWrap: true,
+            reverse: true,
+            scrollDirection: Axis.horizontal,
+            itemBuilder: (ctx, ndx) {
+              return InkWell(
+                child: Container(
+                    color: (hdb.yndx + ndx == cury)
+                        ? const Color(0xffedede9)
+                        : Colors.white,
+                    child: Column(children: [
+                      Text('${ndx + 1}세'),
+                      Text('${hdb.yndx + ndx + 1864}'),
+                      Text(msGan[(hdb.yndx + ndx) % 10]),
+                      Text(msJi[(hdb.yndx + ndx) % 12])
+                    ])),
+                onTap: () {
+                  setState(() {
+                    cury = hdb.yndx + ndx;
+                  });
+                },
+              );
+            },
+            separatorBuilder: (ctx, ndx) {
+              return const SizedBox(width: 4);
+            },
+            itemCount: 120));
+  }
+
+  getMonths(int y) {
+    var n = ((y % 5) + 1) * 2;
+    return Container(
+        height: 100,
+        child: ListView.separated(
+            shrinkWrap: true,
+            reverse: true,
+            scrollDirection: Axis.horizontal,
+            itemBuilder: (ctx, ndx) {
+              return Column(children: [
+                Text('${((ndx) % 12) + 1}월'),
+                Text(msGan[(n + ndx - 1) % 10]),
+                Text(msJi[(ndx + 1) % 12])
+              ]);
+            },
+            separatorBuilder: (ctx, ndx) {
+              return const SizedBox(width: 4);
+            },
+            itemCount: 24));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    var sz = MediaQuery.of(context).size;
+    double sw = min(sz.width, 600.0);
+    return Scaffold(
+        appBar: AppBar(
+          title: const Text('만세력'),
+          actions: [
+            TextButton(
+                onPressed: () {
+                  callManse(false);
+                },
+                child: const Text("수정"))
+          ],
+        ),
+        body: !bReady
+            ? const Center(child: CircularProgressIndicator())
+            : SingleChildScrollView(
+                child: Container(
+                    alignment: Alignment.center,
+                    child: Container(
+                      width: sw,
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                                padding: const EdgeInsets.all(8),
+                                child: Column(children: [
+                                  getRow(const Text("이름"), Text(sname)),
+                                  getRow(const Text("성별"),
+                                      Text(sex == 0 ? "남자" : "여자")),
+                                  getRow(
+                                      const Text("생년월일"),
+                                      Text(
+                                          "${BDT[bdt]} ${d2Str(birth)} ${t2Str(tm)}")),
+                                  getRow(
+                                      Container(),
+                                      Text(
+                                          '음력 ${d2Str(hdb.lun.substring(1))}')),
+                                  getRow(const Text("시차"), Text("$gap분")),
+                                  getRow(const Text("시차적용"), Text('양력 $sol2')),
+                                ])),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                getSaju(hndx),
+                                getSaju(hdb.dndx),
+                                getSaju(hdb.mndx),
+                                getSaju(hdb.yndx),
+                              ],
+                            ),
+                            getDaeList(sw),
+                            getYears(),
+                            getMonths(cury)
+                          ]),
+                    ))));
+  }
+}

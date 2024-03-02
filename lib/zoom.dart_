@@ -1,0 +1,82 @@
+import 'dart:math';
+
+import 'package:flutter/material.dart';
+import 'config.dart';
+import 'lib_spread.dart';
+
+class ZoomPage extends StatefulWidget {
+  final int mcnt, ncnt, mode;
+  final List<int> arr;
+  const ZoomPage(
+      {super.key,
+      required this.mode,
+      required this.mcnt,
+      required this.ncnt,
+      required this.arr});
+
+  @override
+  State<ZoomPage> createState() => _ZoomPageState();
+}
+
+class _ZoomPageState extends State<ZoomPage> {
+  late int mode, mcnt, ncnt;
+  late List<int> parr;
+  List<int> carr = [];
+  late var alen;
+  late var blen;
+  bool bReady = false;
+  bool bError = false;
+  late var arr;
+  @override
+  void initState() {
+    super.initState();
+
+    mode = widget.mode;
+    mcnt = widget.mcnt;
+    ncnt = widget.ncnt;
+    List<int> parr = widget.arr;
+
+    if (mode == 13) {
+      var narr = [2, 3, 0, 1, 4];
+      for (int i = 0; i < narr.length; i++) {
+        carr.add(parr[narr[i]]);
+      }
+    } else {
+      carr = parr;
+    }
+    blen = mode % 1000;
+    arr = bArr[blen];
+    alen = arr[0];
+
+    dPrint(carr);
+    dPrint(bArr[mode % 1000]);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // This method is rerun every time setState is called, for instance as done
+    // by the _incrementCounter method above.
+    //
+    // The Flutter framework has been optimized to make rerunning build methods
+    // fast, so that you can just rebuild anything that needs updating rather
+    // than having to individually change instances of widgets.
+    var sz = MediaQuery.of(context).size;
+    double sw = min(sz.width, 600);
+    return Scaffold(
+        body: InteractiveViewer(
+            //transformationController: _transformationController,
+            //onInteractionEnd: _updateScale,
+            minScale: 1.0,
+            maxScale: 3.0,
+            panEnabled: false,
+            boundaryMargin: const EdgeInsets.all(double.infinity),
+            constrained: true,
+            clipBehavior: Clip.hardEdge,
+            child: Container(
+              width: sw,
+              height: sw,
+              color: Colors.amber,
+              child: Stack(children: drawCards(sw)),
+            )));
+  }
+}

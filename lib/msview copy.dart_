@@ -1,0 +1,143 @@
+import 'dart:math';
+
+import 'package:app/config.dart';
+import 'package:app/lib_manse.dart';
+import 'package:flutter/material.dart';
+import 'package:sprintf/sprintf.dart';
+
+class MSViewPage extends StatefulWidget {
+  final dynamic j;
+  final String birth, tm, ntm;
+  final int sex;
+  final int bdt;
+  final int gap;
+  bool isnew;
+  MSViewPage(
+      {super.key,
+      required this.isnew,
+      required this.j,
+      required this.birth,
+      required this.tm,
+      required this.ntm,
+      required this.gap,
+      required this.sex,
+      required this.bdt});
+
+  @override
+  State<MSViewPage> createState() => _MSViewPageState();
+}
+
+class _MSViewPageState extends State<MSViewPage> {
+  late CHdb hdb;
+  var BDT = ['양력', '음력 평달', '음력 윤달'];
+  late int days;
+  late int hndx;
+  late bool dir;
+  d2Str(String s) {
+    var y = s.substring(0, 4);
+    var m = s.substring(4, 6);
+    var d = s.substring(6, 8);
+    return sprintf(
+        "%4d년 %2d월 %2d일", [int.parse(y), int.parse(m), int.parse(d)]);
+  }
+
+  t2Str(String s) {
+    var h = s.substring(0, 2);
+    var n = s.substring(2, 4);
+    return sprintf("%2d시 %2d분", [int.parse(h), int.parse(n)]);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    dPrint(widget.j);
+    dPrint(widget.birth);
+    dPrint(widget.tm);
+    dPrint(widget.ntm);
+    dPrint('${widget.sex}');
+    dPrint('${widget.bdt}');
+    dPrint('${widget.gap}');
+    var hh = int.parse(widget.ntm.substring(0, 2)) ~/ 2;
+    hdb = CHdb.fromJson(widget.j, hh);
+    hndx = hdb.dndx * 12 + hh;
+    dir = (widget.sex == 0 && hdb.yndx % 2 == 0) ||
+        (widget.sex == 1 && hdb.yndx % 2 == 1);
+    dPrint(dir);
+    dPrint(hdb.jul1);
+    var soldt = DateTime.parse(hdb.sol);
+    var diff = !dir ? soldt.difference(hdb.jdt1) : hdb.jdt3.difference(soldt);
+    days = diff.inDays + (dir ? 0 : -1);
+    days = (days ~/ 3) + ((days % 3) == 2 ? 1 : 0);
+    if (days == 0) days = 1;
+    dPrint('대운: ${dir ? '순행' : '역행'} $days');
+  }
+
+  getDaeList() {
+    return ListView.separated(
+        shrinkWrap: true,
+        reverse: true,
+        physics: const ClampingScrollPhysics(),
+        scrollDirection: Axis.horizontal,
+        itemBuilder: (ctx, ndx) {
+          return Column(children: [
+            Text('${ndx * 10 + days}'),
+            Text(msGan[
+                (dir ? hdb.mndx + ndx + 1 : hdb.mndx + 100 - (ndx + 1)) % 10]),
+            Text(msJi[
+                (dir ? hdb.mndx + ndx + 1 : hdb.mndx + 120 - (ndx + 1)) % 12]),
+          ]);
+        },
+        separatorBuilder: (ctx, ndx) {
+          return const SizedBox(width: 4);
+        },
+        itemCount: 12);
+  }
+
+  getSaju(n) {
+    return Padding(
+        padding: const EdgeInsets.all(8),
+        child: Column(children: [
+          Text(
+            msGan[n % 10],
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          ),
+          Text(
+            msJi[n % 12],
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          )
+        ]));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    var sz = MediaQuery.of(context).size;
+    double sw = min(sz.width, 600.0);
+    return Scaffold(
+        appBar: AppBar(
+          title: const Text('만세력'),
+        ),
+        body: Container(
+            alignment: Alignment.topCenter,
+            child: Container(
+                width: sw,
+                padding: const EdgeInsets.all(8),
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text("성별: ${widget.sex == 0 ? "남자" : "여자"}"),
+                      Text(
+                          "생년월일: ${BDT[widget.bdt]} ${d2Str(widget.birth)} ${t2Str(widget.tm)} 시차 ${widget.gap}분"),
+                      Text("시차적용: 양력 ${d2Str(hdb.sol)} ${t2Str(widget.ntm)}"),
+                      Text("시차적용: 음력 ${d2Str(hdb.lun.substring(1))}"),
+                      Row(
+                        children: [
+                          getSaju(hndx),
+                          getSaju(hdb.dndx),
+                          getSaju(hdb.mndx),
+                          getSaju(hdb.yndx),
+                        ],
+                      ),
+                      Expanded(child: getDaeList())
+                    ]))));
+  }
+}
